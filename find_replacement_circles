@@ -19,6 +19,9 @@ def analyse_sequence(infile,outfile,mindist, maxdist, vseqs):
     with open(outfile,"wt",encoding="utf8") as out:
         for id,seq in read_fasta(infile):
             total_seqs += 1
+
+            if total_seqs % 100000 == 0:
+                print("Processed",total_seqs,"sequences")
             for i,vseq in enumerate(vseqs):
                 # Can we find the VH1 sequence
                 if vseq[1] in seq:
