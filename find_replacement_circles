@@ -1,15 +1,78 @@
 #!/usr/bin/env python3
 import argparse
 from pathlib import Path
+from multiprocessing import Queue, Process
+from threading import Thread
 
 def main():
     global options
+    global queue
     options = get_options()
     vseqs = read_v_sequences(options.vfile)
-    analyse_sequence(options.fasta, options.outfile, options.mindist, options.maxdist, options.allowedmismatches,vseqs)
+    analyse_sequence(vseqs)
 
 
-def analyse_sequence(infile,outfile,mindist, maxdist, mismatches, vseqs):
+def process_sequence(fasta,vseqs,min_total_len, min_v2_len):
+    id,seq = fasta
+
+    if len(seq) < min_total_len:
+        return("seq_too_short")
+    
+    found_v1_hit = False
+    for vseq in vseqs:
+        # Can we find the VH1 sequence
+        lastpos = len(seq)-min_v2_len
+        # print(seq, vseq[1], len(seq), len(vseq[1]),lastpos, min_v2_len)
+        s1_start = fuzzy_index(seq,vseq[1], options.mismatches,0,lastpos)
+        if s1_start != -1:
+            found_v1_hit = True
+            # Get the end position of the sequence
+            s1_end = s1_start+len(vseq[1])
+            
+            found_v2_hit = False
+
+            # We first try the other end to see if this
+            # is compatible with being a germline hit
+            if fuzzy_index(seq,vseq[2],options.mismatches+2,s1_end) != -1:
+                # This is a hit from the same V so it's germline
+                return "germline"
+
+            # Now try all of the other ends.
+            for vseq2 in vseqs:
+                s2_start = fuzzy_index(seq,vseq2[2],options.mismatches,s1_end)
+
+                if s2_start == -1:
+                    continue
+                
+                found_v2_hit = True
+                # If we get a hit it could be a germline one if the V1
+                # sequence is similar enough to the first one we found
+                if fuzzy_index(seq,vseq2[1],options.mismatches+2) != -1:
+                    # Yeah, it's compatible with being germline
+                    return "germline"
+
+                distance = s2_start - s1_end
+
+                if distance < options.mindist:
+                    return "too_short"
+                
+                if distance > options.maxdist:
+                    return "too_long"
+
+                # If we get here we've got a hit.
+                line = [id,vseq[0],vseq2[0],s1_end, s2_start]
+                return line
+
+            # If we get here we found a v1 but no v2
+            if not found_v2_hit:
+                return "nov2"
+            
+    # If we get here then we didn't get a hit to any of the V1 sequences
+    if not found_v1_hit:
+        return "nov1"
+
+
+def analyse_sequence(vseqs):
     seq_too_short = 0
     germline_hits = 0
     nov1 = 0
@@ -19,82 +82,45 @@ def analyse_sequence(infile,outfile,mindist, maxdist, mismatches, vseqs):
     hits = 0
     total_seqs = 0
 
-    min_total_len = len(vseqs[0][0]) + len(vseqs[0][1]) + mindist
-    min_v2_len = len(vseqs[0][1]) + mindist
+    min_total_len = len(vseqs[0][0]) + len(vseqs[0][1]) + options.mindist
+    min_v2_len = len(vseqs[0][1]) + options.mindist
 
 
-    with open(outfile,"wt",encoding="utf8") as out:
-        for id,seq in read_fasta(infile):
+    with open(options.outfile,"wt",encoding="utf8") as out:
+        for fasta in read_fasta(options.fasta):
             total_seqs += 1
 
             if total_seqs % 1000 == 0:
                 print("Processed",total_seqs,"sequences")
 
-            if len(seq) < min_total_len:
-                seq_too_short += 1
-                continue
+            answer = process_sequence(fasta,vseqs,min_total_len,min_v2_len)
 
-            found_v1_hit = False
-            for vseq in vseqs:
-                # Can we find the VH1 sequence
-                lastpos = len(seq)-min_v2_len
-                # print(seq, vseq[1], len(seq), len(vseq[1]),lastpos, min_v2_len)
-                s1_start = fuzzy_index(seq,vseq[1], mismatches,0,lastpos)
-                if s1_start != -1:
-                    found_v1_hit = True
-                    # Get the end position of the sequence
-                    s1_end = s1_start+len(vseq[1])
-                    
-                    found_v2_hit = False
+            if isinstance(answer,list):
+                # It's a hit
+                hits += 1
+                print("\t".join([str(x) for x in answer]), file=out)
 
-                    # We first try the other end to see if this
-                    # is compatible with being a germline hit
-                    if fuzzy_index(seq,vseq[2],mismatches+2,s1_end) != -1:
-                        # This is a hit from the same V so it's germline
-                        found_v2_hit = True
-                        germline_hits += 1
-                        break
+            elif answer =="germline":
+                germline_hits += 1
 
-                    # Now try all of the other ends.
-                    for vseq2 in vseqs:
-                        s2_start = fuzzy_index(seq,vseq2[2],mismatches,s1_end)
 
-                        if s2_start == -1:
-                            continue
-                        
-                        found_v2_hit = True
-                        # If we get a hit it could be a germline one if the V1
-                        # sequence is similar enough to the first one we found
-                        if fuzzy_index(seq,vseq2[1],mismatches+2) != -1:
-                            # Yeah, it's compatible with being germline
-                            germline_hits += 1
-                            break
+            elif answer =="too_short":
+                too_short += 1
 
-                        distance = s2_start - s1_end
+            elif answer =="too_long":
+                too_long += 1
 
-                        if distance < mindist:
-                            too_short += 1
-                            break
-                        
-                        if distance > maxdist:
-                            too_long += 1
-                            break
-
-                        # If we get here we've got a hit.
-                        hits += 1
-                        line = [id,vseq[0],vseq2[0],s1_end, s2_start]
-                        print("\t".join([str(x) for x in line]), file=out)
-                        break
-
-                    # If we get here we found a v1 but no v2
-                    if not found_v2_hit:
-                        nov2 += 1
-                    break
-            # If we get here then we didn't get a hit to any of the V1 sequences
-            if not found_v1_hit:
+            elif answer =="nov1":
                 nov1 += 1
 
-    print("File:", infile)
+            elif answer =="nov2":
+                nov2 += 1
+
+            elif answer =="seq_too_short":
+                seq_too_short += 1
+
+
+    print("File:", options.fasta)
     print("Total: ",total_seqs)
     print("Hits: ",hits)
     print("Seq too short",seq_too_short)
@@ -132,6 +158,15 @@ def read_v_sequences(file):
 
     return vseqs
 
+def make_fasta_queue(file):
+    global queue
+    queue = Queue()
+    for fasta in read_fasta(file):
+        queue.put(fasta)
+
+
+    for _ in range(options.threads):
+        queue.put("DONE")
 
 def read_fasta(file):
     seq = None
@@ -180,8 +215,9 @@ def get_options():
     parser.add_argument("outfile",type=str,help="Output file for hits")
     parser.add_argument("--vfile",type=str,help="File with V sequences to search", default=Path(__file__).parent.joinpath("v_sequences.txt"))
     parser.add_argument("--mindist",type=int, default=0)
+    parser.add_argument("--threads",type=int, default=5)
     parser.add_argument("--maxdist",type=int, default=20)
-    parser.add_argument("--allowedmismatches",type=int, default=1)
+    parser.add_argument("--mismatches",type=int, default=1)
 
 
     options = parser.parse_args()
