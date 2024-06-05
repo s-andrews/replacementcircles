@@ -1,18 +1,45 @@
 #!/usr/bin/env python3
 import argparse
 from pathlib import Path
-from multiprocessing import Queue, Process
+from multiprocessing import Queue, Process, Manager
 from threading import Thread
 
 def main():
     global options
     global queue
+    queue = Queue()
     options = get_options()
+
     vseqs = read_v_sequences(options.vfile)
 
-    
-    make_fasta_queue(options.fasta)
-    analyse_sequence(vseqs)
+    reader_thread = Thread(target=make_fasta_queue)
+    reader_thread.start()
+
+    results = Manager().dict()
+    results["hits"] = []
+    results["seq_too_short"] = 0
+    results["germline"] = 0
+    results["nov1"] = 0
+    results["nov2"] = 0
+    results["too_short"] = 0
+    results["too_long"] = 0
+    results["total_seqs"] = 0
+
+    procs = []
+    for _ in range(options.threads):
+        p = Process(target=analyse_sequence, args=(vseqs,results))
+        procs.append(p)
+        p.start()
+
+    for p in procs:
+        p.join()
+
+    reader_thread.join()
+
+    print("hits",len(results["hits"]))
+    for x in results.keys():
+        if not x=="hits":
+            print(x,results[x])
 
 
 def process_sequence(fasta,vseqs,min_total_len, min_v2_len):
@@ -75,68 +102,31 @@ def process_sequence(fasta,vseqs,min_total_len, min_v2_len):
         return "nov1"
 
 
-def analyse_sequence(vseqs):
-    seq_too_short = 0
-    germline_hits = 0
-    nov1 = 0
-    nov2 = 0
-    too_short = 0
-    too_long = 0
-    hits = 0
-    total_seqs = 0
+def analyse_sequence(vseqs, results):
 
     min_total_len = len(vseqs[0][0]) + len(vseqs[0][1]) + options.mindist
     min_v2_len = len(vseqs[0][1]) + options.mindist
 
+    while True:
+        fasta = queue.get()
 
-    with open(options.outfile,"wt",encoding="utf8") as out:
-        while True:
-            fasta = queue.get()
+        if not isinstance(fasta,tuple):
+            break
 
-            if isinstance(fasta,str):
-                break
+        results["total_seqs"] += 1
 
-            total_seqs += 1
+        if results["total_seqs"] % 1000 == 0:
+            print("Processed",results["total_seqs"],"sequences")
 
-            if total_seqs % 1000 == 0:
-                print("Processed",total_seqs,"sequences")
+        answer = process_sequence(fasta,vseqs,min_total_len,min_v2_len)
 
-            answer = process_sequence(fasta,vseqs,min_total_len,min_v2_len)
+        if isinstance(answer,list):
+            # It's a hit
+            results["hits"].append(answer)
 
-            if isinstance(answer,list):
-                # It's a hit
-                hits += 1
-                print("\t".join([str(x) for x in answer]), file=out)
+        else:
+            results[answer] += 1
 
-            elif answer =="germline":
-                germline_hits += 1
-
-
-            elif answer =="too_short":
-                too_short += 1
-
-            elif answer =="too_long":
-                too_long += 1
-
-            elif answer =="nov1":
-                nov1 += 1
-
-            elif answer =="nov2":
-                nov2 += 1
-
-            elif answer =="seq_too_short":
-                seq_too_short += 1
-
-
-    print("File:", options.fasta)
-    print("Total: ",total_seqs)
-    print("Hits: ",hits)
-    print("Seq too short",seq_too_short)
-    print("Germline: ",germline_hits)
-    print("Too short: ",too_short)
-    print("Too long: ",too_long)
-    print("No V1: ",nov1)
-    print("No V2: ",nov2)
 
                         
 def read_v_sequences(file):
@@ -166,12 +156,9 @@ def read_v_sequences(file):
 
     return vseqs
 
-def make_fasta_queue(file):
-    global queue
-    queue = Queue()
-    for fasta in read_fasta(file):
+def make_fasta_queue():
+    for fasta in read_fasta(options.fasta):
         queue.put(fasta)
-
 
     for _ in range(options.threads):
         queue.put("DONE")
@@ -223,7 +210,7 @@ def get_options():
     parser.add_argument("outfile",type=str,help="Output file for hits")
     parser.add_argument("--vfile",type=str,help="File with V sequences to search", default=Path(__file__).parent.joinpath("v_sequences.txt"))
     parser.add_argument("--mindist",type=int, default=0)
-    parser.add_argument("--threads",type=int, default=5)
+    parser.add_argument("--threads",type=int, default=1)
     parser.add_argument("--maxdist",type=int, default=20)
     parser.add_argument("--mismatches",type=int, default=1)
 
