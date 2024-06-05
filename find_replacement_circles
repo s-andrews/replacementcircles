@@ -9,6 +9,9 @@ def main():
     global queue
     options = get_options()
     vseqs = read_v_sequences(options.vfile)
+
+    
+    make_fasta_queue(options.fasta)
     analyse_sequence(vseqs)
 
 
@@ -87,7 +90,12 @@ def analyse_sequence(vseqs):
 
 
     with open(options.outfile,"wt",encoding="utf8") as out:
-        for fasta in read_fasta(options.fasta):
+        while True:
+            fasta = queue.get()
+
+            if isinstance(fasta,str):
+                break
+
             total_seqs += 1
 
             if total_seqs % 1000 == 0:
