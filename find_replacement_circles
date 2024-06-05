@@ -49,7 +49,7 @@ def analyse_sequence(infile,outfile,mindist, maxdist, mismatches, vseqs):
 
                     # We first try the other end to see if this
                     # is compatible with being a germline hit
-                    if fuzzy_index(seq,vseq[2],mismatches,s1_end) != -1:
+                    if fuzzy_index(seq,vseq[2],mismatches+2,s1_end) != -1:
                         # This is a hit from the same V so it's germline
                         found_v2_hit = True
                         germline_hits += 1
@@ -65,7 +65,7 @@ def analyse_sequence(infile,outfile,mindist, maxdist, mismatches, vseqs):
                         found_v2_hit = True
                         # If we get a hit it could be a germline one if the V1
                         # sequence is similar enough to the first one we found
-                        if fuzzy_index(seq,vseq2[1],mismatches) != -1:
+                        if fuzzy_index(seq,vseq2[1],mismatches+2) != -1:
                             # Yeah, it's compatible with being germline
                             germline_hits += 1
                             break
@@ -86,7 +86,7 @@ def analyse_sequence(infile,outfile,mindist, maxdist, mismatches, vseqs):
                         print("\t".join([str(x) for x in line]), file=out)
                         break
 
-                        # If we get here we found a v1 but no v2
+                    # If we get here we found a v1 but no v2
                     if not found_v2_hit:
                         nov2 += 1
                     break
@@ -151,7 +151,7 @@ def read_fasta(file):
             yield(id,seq)
 
 
-def fuzzy_index(longstr,shortstr,allowed_mismatches, initialpos=0, lastpos=-1):
+def fuzzy_index(longstr,shortstr,allowed_mismatches=0, initialpos=0, lastpos=-1):
     """Find if one string is in another allowing some mismatch"""
 
     if lastpos == -1:
