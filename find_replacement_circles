@@ -15,8 +15,9 @@ def main():
     reader_thread = Thread(target=make_fasta_queue)
     reader_thread.start()
 
-    results = Manager().dict()
-    results["hits"] = []
+    manager = Manager()
+    results = manager.dict()
+    results["hits"] = manager.list()
     results["seq_too_short"] = 0
     results["germline"] = 0
     results["nov1"] = 0
