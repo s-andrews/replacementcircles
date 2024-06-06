@@ -136,7 +136,7 @@ def read_v_sequences(file):
     with open(file,"rt", encoding="utf8") as infh:
         infh.readline()
         for line in infh:
-            ig,fromseq,toseq = line.strip().split("\t")
+            ig,fromseq,toseq = line.strip().split()
             vseqs.append((ig,fromseq.lower(),toseq.lower()))
 
 
