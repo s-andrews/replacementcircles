@@ -3,6 +3,7 @@ import argparse
 from pathlib import Path
 from multiprocessing import Queue, Process, Manager
 from threading import Thread
+import gzip
 
 def main():
     global options
@@ -158,11 +159,41 @@ def read_v_sequences(file):
     return vseqs
 
 def make_fasta_queue():
-    for fasta in read_fasta(options.fasta):
+    for fasta in read_seqfile(options.fasta):
         queue.put(fasta)
 
     for _ in range(options.threads):
         queue.put("DONE")
+
+
+def read_seqfile(file):
+    if file.lower().endswith("fa") or file.lower().endswith("fasta"):
+        yield from read_fasta(file)
+
+    else:
+        yield from read_fastq(file)
+
+def read_fastq(file):
+    seq = None
+    id = None
+
+    infh = None
+
+    if file.lower().endswith("gz"):
+        infh = gzip.open(file,"rt",encoding="utf8")
+    else:
+        infh = open(file,"rt",encoding="utf8")
+
+
+    for line in infh:
+        id = line.strip()[1:]
+        seq = infh.readline().strip()
+        infh.readline()
+        infh.readline()
+        yield(id,seq)
+
+    infh.close()
+
 
 def read_fasta(file):
     seq = None
@@ -207,7 +238,7 @@ def fuzzy_index(longstr,shortstr,allowed_mismatches=0, initialpos=0, lastpos=-1)
 def get_options():
 
     parser = argparse.ArgumentParser("Find mis-spliced VDJ Sequences")
-    parser.add_argument("fasta",type=str,help="FastA format sequence file to search")
+    parser.add_argument("fasta",type=str,help="FastA or FastQ format sequence file to search")
     parser.add_argument("outfile",type=str,help="Output file for hits")
     parser.add_argument("--vfile",type=str,help="File with V sequences to search", default=Path(__file__).parent.joinpath("v_sequences.txt"))
     parser.add_argument("--mindist",type=int, default=0)
