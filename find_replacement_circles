@@ -43,6 +43,13 @@ def main():
         if not x=="hits":
             print(x,results[x])
 
+    print("Saving results to",options.outfile)
+
+    with open(options.outfile,"wt",encoding="utf8") as out:
+        print("\t".join(["READ_ID","VSEQ1","VSEQ2","VSEQ1_END", "VSEQ2_START", "DISTANCE"]), file=out)
+        for hit in results["hits"]:
+            print("\t".join(hit), file=out)
+
 
 def process_sequence(sequence,vseqs,min_total_len, min_v2_len):
     id,seq = sequence
@@ -92,7 +99,7 @@ def process_sequence(sequence,vseqs,min_total_len, min_v2_len):
                     return "too_long"
 
                 # If we get here we've got a hit.
-                line = [id,vseq[0],vseq2[0],s1_end, s2_start]
+                line = [id,vseq[0],vseq2[0],s1_end, s2_start, distance]
                 return line
 
             # If we get here we found a v1 but no v2
@@ -179,6 +186,8 @@ def read_fastq(file):
 
     infh = None
 
+    complementtable = str.maketrans("gatc","ctag")
+
     if file.lower().endswith("gz"):
         infh = gzip.open(file,"rt",encoding="utf8")
     else:
@@ -187,7 +196,12 @@ def read_fastq(file):
 
     for line in infh:
         id = line.strip()[1:]
-        seq = infh.readline().strip()
+        seq = infh.readline().strip().lower()
+
+        if not options.noreverse:
+            seq = seq.translate(complementtable)
+            seq = seq[::-1]
+
         infh.readline()
         infh.readline()
         yield(id,seq)
@@ -198,6 +212,9 @@ def read_fastq(file):
 def read_fasta(file):
     seq = None
     id = None
+
+    complementtable = str.maketrans("gatc","ctag")
+
     with open(file,"rt",encoding="utf8") as infh:
         for line in infh:
             if line.startswith(">"):
@@ -210,6 +227,9 @@ def read_fasta(file):
                 seq += line.lower().strip()
 
         if seq is not None:
+            if not options.noreverse:
+                seq = seq.translate(complementtable)
+                seq = seq[::-1]
             yield(id,seq)
 
 
@@ -241,6 +261,7 @@ def get_options():
     parser.add_argument("seqfile",type=str,help="FastA or FastQ format sequence file to search")
     parser.add_argument("outfile",type=str,help="Output file for hits")
     parser.add_argument("--vfile",type=str,help="File with V sequences to search", default=Path(__file__).parent.joinpath("v_sequences.txt"))
+    parser.add_argument("--noreverse",type=bool, help="Do not reverse complement input sequences")
     parser.add_argument("--mindist",type=int, default=0)
     parser.add_argument("--threads",type=int, default=1)
     parser.add_argument("--maxdist",type=int, default=20)
