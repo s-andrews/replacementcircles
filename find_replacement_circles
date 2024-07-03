@@ -13,7 +13,7 @@ def main():
 
     vseqs = read_v_sequences(options.vfile)
 
-    reader_thread = Thread(target=make_fasta_queue)
+    reader_thread = Thread(target=make_sequence_queue)
     reader_thread.start()
 
     manager = Manager()
@@ -44,8 +44,8 @@ def main():
             print(x,results[x])
 
 
-def process_sequence(fasta,vseqs,min_total_len, min_v2_len):
-    id,seq = fasta
+def process_sequence(sequence,vseqs,min_total_len, min_v2_len):
+    id,seq = sequence
 
     if len(seq) < min_total_len:
         return("seq_too_short")
@@ -110,9 +110,9 @@ def analyse_sequence(vseqs, results):
     min_v2_len = len(vseqs[0][1]) + options.mindist
 
     while True:
-        fasta = queue.get()
+        sequence = queue.get()
 
-        if not isinstance(fasta,tuple):
+        if not isinstance(sequence,tuple):
             break
 
         results["total_seqs"] += 1
@@ -120,7 +120,7 @@ def analyse_sequence(vseqs, results):
         if results["total_seqs"] % 1000 == 0:
             print("Processed",results["total_seqs"],"sequences")
 
-        answer = process_sequence(fasta,vseqs,min_total_len,min_v2_len)
+        answer = process_sequence(sequence,vseqs,min_total_len,min_v2_len)
 
         if isinstance(answer,list):
             # It's a hit
@@ -158,9 +158,9 @@ def read_v_sequences(file):
 
     return vseqs
 
-def make_fasta_queue():
-    for fasta in read_seqfile(options.fasta):
-        queue.put(fasta)
+def make_sequence_queue():
+    for sequence in read_seqfile(options.seqfile):
+        queue.put(sequence)
 
     for _ in range(options.threads):
         queue.put("DONE")
@@ -238,7 +238,7 @@ def fuzzy_index(longstr,shortstr,allowed_mismatches=0, initialpos=0, lastpos=-1)
 def get_options():
 
     parser = argparse.ArgumentParser("Find mis-spliced VDJ Sequences")
-    parser.add_argument("fasta",type=str,help="FastA or FastQ format sequence file to search")
+    parser.add_argument("seqfile",type=str,help="FastA or FastQ format sequence file to search")
     parser.add_argument("outfile",type=str,help="Output file for hits")
     parser.add_argument("--vfile",type=str,help="File with V sequences to search", default=Path(__file__).parent.joinpath("v_sequences.txt"))
     parser.add_argument("--mindist",type=int, default=0)
