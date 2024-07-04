@@ -48,7 +48,7 @@ def main():
     with open(options.outfile,"wt",encoding="utf8") as out:
         print("\t".join(["READ_ID","VSEQ1","VSEQ2","VSEQ1_END", "VSEQ2_START", "DISTANCE"]), file=out)
         for hit in results["hits"]:
-            print("\t".join(hit), file=out)
+            print("\t".join([str(x) for x in hit]), file=out)
 
 
 def process_sequence(sequence,vseqs,min_total_len, min_v2_len):
