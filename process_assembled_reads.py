@@ -7,7 +7,9 @@ def main():
 
     file = sys.argv[1]
 
+    # We'll handle input files which are either gzipped or not
     outfile = file.replace(".fastq.gz","_filtered.fa")
+    outfile = file.replace(".fastq","_filtered.fa")
 
     print("Outfile",outfile)
 
@@ -19,41 +21,51 @@ def main():
         "good": 0
     }
 
-    with gzip.open(file,"rt",encoding="utf8") as infh:
-        for header in infh:
-            header = header.strip()
-            seq = infh.readline().strip()
-            infh.readline()
-            qual = infh.readline().strip()
+    infh = None
 
-            # Get the UMI
-            umi = seq[:12]
+    if file.lower().endswith(gz):
+        infh = gzip.open(file,"rt",encoding="utf8")
+    else:
+        infh = open(file,"rt",encoding="utf8")
 
-            if "N" in umi:
-                rejects["numi"] += 1
-                continue
+    for header in infh:
+        header = header.strip()
+        seq = infh.readline().strip()
+        infh.readline()
+        qual = infh.readline().strip()
 
-            seq = seq[12:]
+        # Get the UMI
+        umi = seq[:12]
 
-            if seq.startswith("CTGCTCCT"):
-                seq = seq[8:]
-            elif seq.startswith("GACTCGT"):
-                seq = seq[7:]
-            else:
-                rejects["nolinker"] += 1
-                continue
+        # Add the sequence length to the umi to generate more diversity
+        umi += str(len(seq))
 
-            phred = average_quality(qual)
+        if "N" in umi:
+            rejects["numi"] += 1
+            continue
 
-            if umi in seen:
-                rejects["dup"] += 1
-                if seen[umi]["phred"] < phred:
-                    seen[umi] = {"id":header[1:],"seq":seq,"phred":phred}
+        seq = seq[12:]
 
-            else:
-                rejects["good"] += 1
+        if seq.startswith("CTGCTCCT"):
+            seq = seq[8:]
+        elif seq.startswith("GACTCGT"):
+            seq = seq[7:]
+        else:
+            rejects["nolinker"] += 1
+            continue
+
+        phred = average_quality(qual)
+
+        if umi in seen:
+            rejects["dup"] += 1
+            if seen[umi]["phred"] < phred:
                 seen[umi] = {"id":header[1:],"seq":seq,"phred":phred}
 
+        else:
+            rejects["good"] += 1
+            seen[umi] = {"id":header[1:],"seq":seq,"phred":phred}
+
+    infh.close()
 
     for reason in rejects.keys():
         print(reason,rejects[reason])
