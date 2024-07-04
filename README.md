@@ -69,10 +69,10 @@ Most of the sequences in your database will have a standard V1/V2 germline combi
 
 The process for searching is as follows:
 
-1. The sequences is searched against the V1 sequences allowing (by default) 1bp mismatch until a match is found.  If no match is found the sequence is rejected.
-2. If a match is found the corresponding V2 sequence is searched, allowing up to 3 mismatches (by default).  If it is found the sequence is rejected as germline.
+1. The sequence is searched against the V1 sequences allowing (by default) 1bp mismatch until a match is found.  If no match is found the sequence is rejected.
+2. If a match is found the corresponding V2 sequence to the V1 hit is searched, allowing up to 3 mismatches (by default).  If it is found, the sequence is rejected as germline.
 3. If no match is found then the remaining V2 sequences are searched until a match is found.  If no match is found the sequence is rejected.
-4. If a V2 match is found then the corresponding V1 sequences is searched allowing up to 3 mismatches.  If that is found then the sequence is rejected as germline.
+4. If a V2 match is found then the corresponding V1 sequence to the V2 hit is searched allowing up to 3 mismatches.  If that is found then the sequence is rejected as germline.
 5. If no match was found to the V1 then the non-canonical V1/V2 pair is reported.
 
 Because of the high degree of similarity between V1 and V2 sequences (some are completely identical), the reported pairing may not be the only one which is compatible with the sequence, but other matches would also not be germline compatible, and would be highly similar (within 1bp) of the reported pairs.
