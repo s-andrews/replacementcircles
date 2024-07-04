@@ -1,17 +1,12 @@
 #!/usr/bin/env python3
 import sys
 import gzip
+import argparse
 
 
 def main():
 
-    file = sys.argv[1]
-
-    # We'll handle input files which are either gzipped or not
-    outfile = file.replace(".fastq.gz","_filtered.fa")
-    outfile = file.replace(".fastq","_filtered.fa")
-
-    print("Outfile",outfile)
+    options = get_options()
 
     seen = {}
     rejects = {
@@ -23,10 +18,10 @@ def main():
 
     infh = None
 
-    if file.lower().endswith(gz):
-        infh = gzip.open(file,"rt",encoding="utf8")
+    if options.seqfile.lower().endswith("gz"):
+        infh = gzip.open(options.seqfile,"rt",encoding="utf8")
     else:
-        infh = open(file,"rt",encoding="utf8")
+        infh = open(options.seqfile,"rt",encoding="utf8")
 
     for header in infh:
         header = header.strip()
@@ -70,11 +65,10 @@ def main():
     for reason in rejects.keys():
         print(reason,rejects[reason])
 
-    with open(outfile,"wt", encoding="utf8") as out:
+    with open(options.outfile,"wt", encoding="utf8") as out:
         for seq in seen.values():
             print(">"+seq["id"], file=out)
             print(seq["seq"], file=out)
-
 
 
 def average_quality(qual):
@@ -88,5 +82,18 @@ def average_quality(qual):
     return phredsum/len(qual)
 
 
+def get_options():
 
-main()
+    parser = argparse.ArgumentParser("Preprocess and deduplicate assembled VDJ sequences")
+    parser.add_argument("seqfile",type=str,help="FastQ format sequence file to process")
+    parser.add_argument("outfile",type=str,help="Output file for processed data")
+
+    options = parser.parse_args()
+
+
+    return options
+
+
+
+if __name__ == "__main__":
+    main()
