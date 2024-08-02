@@ -23,6 +23,8 @@ def main():
     else:
         infh = open(options.seqfile,"rt",encoding="utf8")
 
+    out = open(options.outfile,"wt", encoding="utf8")
+
     for header in infh:
         header = header.strip()
         seq = infh.readline().strip()
@@ -33,7 +35,7 @@ def main():
         umi = seq[:12]
 
         # Add the sequence length to the umi to generate more diversity
-        umi += str(len(seq))
+        umi_seqlen = len(seq)
 
         if "N" in umi:
             rejects["numi"] += 1
@@ -49,37 +51,36 @@ def main():
             rejects["nolinker"] += 1
             continue
 
-        phred = average_quality(qual)
-
+        keepingIt = True
         if umi in seen:
-            rejects["dup"] += 1
-            if seen[umi]["phred"] < phred:
-                seen[umi] = {"id":header[1:],"seq":seq,"phred":phred}
+            # We could have seen this before.  We now need to check the lengths of 
+            # the hits and we'll only keep it if ours is more than 4bp different
 
+            for seenlength in seen[umi]:
+                if abs(seenlength-umi_seqlen < 4):
+                    keepingIt = False
+                    break
+
+        if not keepingIt:
+            rejects["dup"] += 1
         else:
             rejects["good"] += 1
-            seen[umi] = {"id":header[1:],"seq":seq,"phred":phred}
+            if not umi in seen:
+                seen[umi] = set()
+
+            if not umi_seqlen in seen[umi]:
+                seen[umi].add(umi_seqlen)
+
+            print(">"+header[1:], file=out)
+            print(seq, file=out)
+
 
     infh.close()
+    out.close()
 
     for reason in rejects.keys():
         print(reason,rejects[reason])
 
-    with open(options.outfile,"wt", encoding="utf8") as out:
-        for seq in seen.values():
-            print(">"+seq["id"], file=out)
-            print(seq["seq"], file=out)
-
-
-def average_quality(qual):
-    phredsum = 0
-
-    for letter in qual:
-        phred = ord(letter) - 33
-        phredsum += phred
-
-
-    return phredsum/len(qual)
 
 
 def get_options():
