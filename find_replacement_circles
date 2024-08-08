@@ -74,8 +74,11 @@ def process_sequence(sequence,vseqs,min_total_len, min_v2_len):
     
     # We first try the other end to see if this
     # is compatible with being a germline hit
-    if fuzzy_index(seq,vseq[2],options.mismatches+2,s1_end) != -1:
+#    if fuzzy_index(seq,vseq[2],options.mismatches+2,s1_end) != -1:
+    if fuzzy_index(seq,vseq[2],0,s1_end)[0] != -1:
+        print("Found hit at ",fuzzy_index(seq,vseq[2],0,s1_end))
         # This is a hit from the same V so it's germline
+        print(seq,"\n",vseq[0],"\n",vseq[1],"\n",vseq[2],"\n\n")
         return "germline"
 
     # Now try all of the other ends.
@@ -86,7 +89,7 @@ def process_sequence(sequence,vseqs,min_total_len, min_v2_len):
         
     # If we get a hit it could be a germline one if the V1
     # sequence is similar enough to the first one we found
-    if fuzzy_index(seq,vseq2[1],options.mismatches+2) != -1:
+    if fuzzy_index(seq,vseq2[1],options.mismatches+2)[0] != -1:
         # Yeah, it's compatible with being germline
         return "germline"
 
@@ -109,7 +112,8 @@ def find_best_fuzzy_match(seq,vseqs,vseq_index,mismatches,start,end):
     best_mismatches = None
 
     for vseq in vseqs:
-        index,mismatches = fuzzy_index(seq,vseqs[vseq_index],mismatches,start,end)
+        index,mismatches = fuzzy_index(seq,vseq[vseq_index],mismatches,start,end)
+
         if index != -1:
             if best_mismatches is None:
                 best_vseq = vseq
