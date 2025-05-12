@@ -20,8 +20,8 @@ def reverse_fasta(infile,outfile):
         for id,seq in read_fasta(infile):
             seq = seq[::-1]
             seq = seq.translate(transtab)
-            seq = "\n".join(textwrap.wrap(seq,width=50))
-            print(f">{id}\n{seq}", file=out)
+            #seq = "\n".join(textwrap.wrap(seq,width=50))
+            print(f">{id}\n{seq.upper()}", file=out)
 
 
 
