@@ -5,6 +5,8 @@ from multiprocessing import Queue, Process, Manager
 from threading import Thread
 import gzip
 
+VERSION="1.0"
+
 def main():
     global options
     global queue
@@ -291,6 +293,8 @@ def get_options():
     parser.add_argument("--threads",type=int, default=1)
     parser.add_argument("--maxdist",type=int, default=20)
     parser.add_argument("--mismatches",type=int, default=1)
+
+    parser.add_argument('--version', action='version', version=f"find_replacement_circles v{VERSION} https://github.com/s-andrews/replacementcircles/")
 
 
     options = parser.parse_args()

@@ -3,6 +3,7 @@ import sys
 import gzip
 import argparse
 
+VERSION="1.0"
 
 def main():
 
@@ -88,6 +89,9 @@ def get_options():
     parser = argparse.ArgumentParser("Preprocess and deduplicate assembled VDJ sequences")
     parser.add_argument("seqfile",type=str,help="FastQ format sequence file to process")
     parser.add_argument("outfile",type=str,help="Output file for processed data")
+
+    parser.add_argument('--version', action='version', version=f"process_assembled_reads.py v{VERSION} https://github.com/s-andrews/replacementcircles/")
+
 
     options = parser.parse_args()
 
